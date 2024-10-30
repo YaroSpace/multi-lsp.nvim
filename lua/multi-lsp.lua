@@ -1,5 +1,6 @@
 local log = require('vim.lsp.log')
 local util = require("vim.lsp.util")
+local protocol = require('vim.lsp.protocol')
 
 local M = {}
 ---
@@ -10,11 +11,11 @@ M.config = {
 	border = "rounded",
 	silent = true,
 	filter = {
-    ['textDocument/hover'] = 'ruby_lsp',
+    ['textDocument/hover'] = 'all',
     ['textDocument/definition'] = 'all',
     ['textDocument/signatureHelp'] = 'all'
 	},
-	focus_signature_mapping = '<C-j>'
+	focus_signature_mapping = 'K'
 }
 
 ---@param ctx lsp.HandlerContext
@@ -49,7 +50,7 @@ function M.hover(_, result, ctx, config)
   local buf, client, clients_no, visits_count = get_context(ctx, method)
 
   local filter = M.config.filter[method]
-  if filter and filter ~= client.name then return end
+  if filter and filter ~= 'all' and filter ~= client.name then return end
 
 	local format = "markdown"
 	local contents ---@type string[]
@@ -120,7 +121,7 @@ M.location = function(_, result, ctx, config)
   local buf, client, clients_no, visits_count = get_context(ctx, method)
 
   local filter = M.config.filter[method]
-  if filter and filter ~= client.name then return end
+  if filter and filter ~= 'all' and filter ~= client.name then return end
 
   local stored_result = vim.F.npcall(vim.api.nvim_buf_get_var, buf, method .. '_result')
 	config = vim.tbl_deep_extend("keep", config or {}, M.config)
@@ -166,7 +167,7 @@ M.location = function(_, result, ctx, config)
 end
 
 local function set_mapping_for_signature_window(current_buf, signature_buf, signature_win)
-  vim.keymap.set('i', '<C-j>', '', {
+  vim.keymap.set('i', M.config.focus_signature_mapping, '', {
     buffer = current_buf,
     callback = function()
       vim.api.nvim_create_autocmd('BufWinLeave', {
@@ -177,6 +178,7 @@ local function set_mapping_for_signature_window(current_buf, signature_buf, sign
         end
       })
       vim.api.nvim_set_current_win(signature_win)
+      vim.api.nvim_input('<ESC>')
     end
   })
 end
@@ -191,7 +193,7 @@ function M.signature_help(_, result, ctx, config)
   local buf, client, clients_no, visits_count = get_context(ctx, method)
 
   local filter = M.config.filter[method]
-  if filter and filter ~= client.name then return end
+  if filter and filter ~= 'all' and filter ~= client.name then return end
 
 	local lines, hl
   local stored_result = vim.F.npcall(vim.api.nvim_buf_get_var, buf, method .. '_result')
@@ -243,12 +245,94 @@ function M.signature_help(_, result, ctx, config)
   return show_signature()
 end
 
+local DEFAULT_CLIENT_ID = -1
+
+local function get_client_id(client_id)
+  if client_id == nil then
+    client_id = DEFAULT_CLIENT_ID
+  end
+
+  return client_id
+end
+
+---@param severity lsp.DiagnosticSeverity
+local function severity_lsp_to_vim(severity)
+  if type(severity) == 'string' then
+    severity = protocol.DiagnosticSeverity[severity] --- @type integer
+  end
+  return severity
+end
+
+local function convert_severity(opt)
+  if type(opt) == 'table' and not opt.severity and opt.severity_limit then
+    vim.deprecate('severity_limit', '{min = severity} See vim.diagnostic.severity', '0.11')
+    opt.severity = { min = severity_lsp_to_vim(opt.severity_limit) }
+  end
+end
+
+--- @param config? vim.diagnostic.Opts
+function M.publish_diagnostics(_, result, ctx, config)
+  local uri, client_id, diagnostics, is_pull = result.uri, ctx.client_id, result.diagnostics, false
+
+  local method = 'publishDiagnostics'
+  local buf, client, clients_no, visits_count = get_context(ctx, method)
+
+  local fname = vim.uri_to_fname(uri)
+
+  if #diagnostics == 0 and vim.fn.bufexists(fname) == 0 then
+    return
+  end
+
+  local bufnr = vim.fn.bufadd(fname)
+  if not bufnr then
+    return
+  end
+
+  local diag_1 = diagnostics[1] or {}
+  local diag_2 = diagnostics[2] or {}
+
+  if client.name == 'ruby-lsp' then LOG(diagnostics) end
+  -- LOG(client.name, '1', diag_1.code, diag_1.message)
+  -- LOG(client.name, '2', diag_2.code, diag_2.message)
+
+  -- client_id = get_client_id(client_id)
+  -- local namespace = M.get_namespace(client_id, is_pull)
+  --
+  -- if config then
+  --   --- @cast config table<string, table>
+  --   for _, opt in pairs(config) do
+  --     convert_severity(opt)
+  --   end
+  --   -- Persist configuration to ensure buffer reloads use the same
+  --   -- configuration. To make lsp.with configuration work (See :help
+  --   -- lsp-handler-configuration)
+  --   vim.diagnostic.config(config, namespace)
+  -- end
+  --
+  -- vim.diagnostic.set(namespace, bufnr, diagnostic_lsp_to_vim(diagnostics, bufnr, client_id))
+end
+
 M.setup = function(opts)
   vim.lsp.handlers['textDocument/hover'] = M.hover
   vim.lsp.handlers['textDocument/definition'] = M.location
-  vim.lsp.handlers['textDocument/signatureHelp'] = M.signature_help
+	vim.lsp.handlers["textDocument/signatureHelp"] = M.signature_help
+	vim.lsp.handlers["textDocument/publishDiagnostics"] = M.publish_diagnostics
 
-  vim.keymap.set('n', ',w', ":w | =loadfile(vim.fn.expand('%'))()<cr> | :mes clear", {})
+	-- vim.diagnostic.config({
+	-- 	float = {
+	-- 		source = "if_many",
+	-- 	},
+	-- 	severity_sort = true,
+	-- 	signs = {
+	-- 		text = { "", "", "󰋼", "󰌵" },
+	-- 	},
+	-- 	underline = true,
+	-- 	update_in_insert = false,
+	-- 	virtual_text = {
+ --      source = 'if_many'
+ --    }
+	-- })
+  LOG('Multi-lsp loaded')
 end
 
 M.setup()
