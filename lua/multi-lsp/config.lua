@@ -25,7 +25,7 @@ local config = {
 		},
 
 		diagnostics = {
-			enabled_servers = { "all" },
+			enabled_servers = { 'ruby_lsp' },
 			filter = {},
 			-- 	float = {
 			-- 		source = "if_many",

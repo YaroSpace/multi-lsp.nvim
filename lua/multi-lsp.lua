@@ -9,7 +9,7 @@ local config = require("multi-lsp.config")
 local on_hover = require("multi-lsp.hover").on_hover
 local on_location = require("multi-lsp.location").on_location
 local on_signature = require("multi-lsp.signature").on_signature
-local diagnostics = require("multi-lsp.diagnostics")
+local on_diagnostic = require("multi-lsp.diagnostics").on_diagnostic
 
 local M = {}
 
@@ -18,31 +18,33 @@ local function is_enabled(client, method)
   return vim.tbl_contains(enabled_servers, client.name) or vim.tbl_contains(enabled_servers, 'all')
 end
 
+---Stub out filtered methods, so that Lsp does not fallback to built-in implementation
+local function stub()
+	return stub
+end
+
 ---@param client vim.lsp.Client
 local function setup_handlers(client)
 	if not vim.tbl_contains(config.enabled_servers, client.name) then return end
 
 	local client_handlers = client.handlers
 
-	if is_enabled(client, 'signature') then
-	  client_handlers["textDocument/signatureHelp"] = on_signature
-	end
+	local handler = is_enabled(client, 'signature') and on_signature or stub
+	client_handlers["textDocument/signatureHelp"] = handler
 
-	if is_enabled(client, 'hover') then
-		client_handlers["textDocument/hover"] = on_hover
-	end
+	handler = is_enabled(client, 'hover') and on_hover or stub
+	client_handlers["textDocument/hover"] = handler
 
-	if is_enabled(client, 'location') then
-	  client_handlers["textDocument/definition"] = on_location
-    client_handlers["textDocument/implementation"] = on_location
-    client_handlers["textDocument/typeDefinition"] = on_location
-    client_handlers["textDocument/declaration"] = on_location
-	end
+	handler = is_enabled(client, 'location') and on_location or stub
+	client_handlers["textDocument/definition"] = handler
+  client_handlers["textDocument/implementation"] = handler
+  client_handlers["textDocument/typeDefinition"] = handler
+  client_handlers["textDocument/declaration"] = handler
 
-	if is_enabled(client, 'diagnostics') then
-		client_handlers["textDocument/publishDiagnostics"] = diagnostics.on_publish_diagnostics
-		client_handlers["textDocument/diagnostics"] = diagnostics.on_diagnostic
-	end
+	handler = is_enabled(client, 'diagnostics') and on_diagnostic or stub
+	client_handlers["textDocument/publishDiagnostics"] = handler('publishDiagnostics')
+	client_handlers["textDocument/diagnostic"] = handler
+	LOG(client.name, is_enabled(client, 'diagnostics'), debug.getinfo(client_handlers["textDocument/diagnostic"]))
 
 	LOG("Multi-lsp loaded for client " .. client.name)
 end
@@ -63,6 +65,7 @@ M.setup = function(opts)
   set_lsp_attach_command()
 end
 
+_G.Diag = nil
 for _, client in ipairs(vim.lsp.get_clients()) do
 	setup_handlers(client)
 end
