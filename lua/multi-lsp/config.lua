@@ -25,20 +25,25 @@ local config = {
 		},
 
 		diagnostics = {
-			enabled_servers = { 'ruby_lsp' },
+			enabled_servers = { "ruby_lsp" },
 			filter = {},
-			-- 	float = {
-			-- 		source = "if_many",
-			-- 	},
-			-- 	severity_sort = true,
-			-- 	signs = {
-			-- 		text = { "", "", "󰋼", "󰌵" },
-			-- 	},
-			-- 	underline = true,
-			-- 	update_in_insert = false,
-			-- 	virtual_text = {
-			--      source = 'if_many'
-			--    }
+			float = {
+				border = "rounded",
+				focused = false,
+				header = "",
+				prefix = "",
+				source = false,
+				style = "minimal",
+			},
+			severity_sort = true,
+			signs = {
+				text = { "", "", "󰋼", "󰌵" },
+			},
+			underline = true,
+			update_in_insert = false,
+			virtual_text = {
+				source = false,
+			},
 		},
 	},
 }

@@ -1,8 +1,4 @@
-package.loaded['multi-lsp.hover'] = nil
-package.loaded['multi-lsp.location'] = nil
-package.loaded['multi-lsp.signature'] = nil
-package.loaded['multi-lsp.diagnostics'] = nil
-package.loaded['multi-lsp.config'] = nil
+Redefine_require(true)
 
 local config = require("multi-lsp.config")
 
@@ -27,7 +23,7 @@ end
 local function setup_handlers(client)
 	if not vim.tbl_contains(config.enabled_servers, client.name) then return end
 
-	local client_handlers = client.handlers
+  local client_handlers = {}
 
 	local handler = is_enabled(client, 'signature') and on_signature or stub
 	client_handlers["textDocument/signatureHelp"] = handler
@@ -44,9 +40,10 @@ local function setup_handlers(client)
 	handler = is_enabled(client, 'diagnostics') and on_diagnostic or stub
 	client_handlers["textDocument/publishDiagnostics"] = handler('publishDiagnostics')
 	client_handlers["textDocument/diagnostic"] = handler
-	LOG(client.name, is_enabled(client, 'diagnostics'), debug.getinfo(client_handlers["textDocument/diagnostic"]))
 
-	LOG("Multi-lsp loaded for client " .. client.name)
+	client.handlers = client_handlers
+
+	vim.notify("Multi-lsp loaded for client " .. client.name)
 end
 
 local set_lsp_attach_command = function()
@@ -65,9 +62,10 @@ M.setup = function(opts)
   set_lsp_attach_command()
 end
 
-_G.Diag = nil
 for _, client in ipairs(vim.lsp.get_clients()) do
 	setup_handlers(client)
 end
+
+Redefine_require()
 
 return M

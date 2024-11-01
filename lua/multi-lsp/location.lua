@@ -20,6 +20,19 @@ local function remove_duplicate_locations(locations)
 	end
 	return locations
 end
+
+local function set_results_source(source, result)
+  for _, ret in ipairs(result) do
+    ret.source = source
+  end
+end
+
+local function set_items_source(items)
+  for _, item in ipairs(items) do
+    item.text = item.text .. '  --  ' .. item.user_data.source
+  end
+end
+
 --- Jumps to a location. Used as a handler for multiple LSP methods.
 ---@param _ nil not used
 ---@param result (table) result of LSP method; a location or a list of locations.
@@ -46,6 +59,8 @@ M.on_location = function(_, result, ctx, config)
     local title = 'LSP locations'
     local items = util.locations_to_items(stored_result, client.offset_encoding)
 
+    set_items_source(items)
+
     if config.on_list then
       assert(vim.is_callable(config.on_list), 'on_list is not a function')
       return config.on_list({ title = title, items = items })
@@ -70,6 +85,7 @@ M.on_location = function(_, result, ctx, config)
   end
 
   if not vim.islist(result) then result = { result } end
+  set_results_source(client.name, result)
 
   stored_result = stored_result and vim.list_extend(stored_result, result) or result
   vim.api.nvim_buf_set_var(buf, method .. '_result', stored_result)
