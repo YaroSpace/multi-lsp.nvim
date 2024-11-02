@@ -8,17 +8,38 @@ local M = {}
 
 ---@param locations table
 local function remove_duplicate_locations(locations)
-	if #locations == 2 then
-		local uri_1 = locations[1].targetUri or locations[1].uri
-		local uri_2 = locations[2].targetUri or locations[2].uri
-		local start_line_1 = locations[1].range and locations[1].range.start.line or locations[1].targetRange.start.line
-		local start_line_2 = locations[2].range and locations[2].range.start.line or locations[2].targetRange.start.line
+  local ret = {}
+  local uniq = {}
 
-		if uri_1 == uri_2 and start_line_1 == start_line_2 then
-			table.remove(locations, 1)
-		end
-	end
-	return locations
+  for _, el in ipairs(locations) do
+    local key = el.filename .. el.lnum
+    if not uniq[key] then
+      uniq[key] = el
+      table.insert(ret, el)
+    end
+  end
+
+	return ret
+end
+
+local function sort_locations(el_1, el_2)
+  local filename = vim.fn.bufname()
+
+  if el_1.filename == el_2.filename then
+    return el_1.lnum < el_2.lnum
+  end
+
+  local score_1 = el_1.filename:find(filename) and 100 or 0
+  local score_2 = el_2.filename:find(filename) and 100 or 0
+
+  if score_1 ~= score_2 then return score_1 > score_2 end
+
+  local score_1 = el_1.filename:find('%.rbs') and 100 or 0
+  local score_2 = el_2.filename:find('%.rbs') and 100 or 0
+
+  if score_1 ~= score_2 then return score_1 < score_2 end
+
+  return el_1.filename < el_2.filename
 end
 
 local function set_results_source(source, result)
@@ -54,10 +75,12 @@ M.on_location = function(_, result, ctx, config)
     if not stored_result or #stored_result == 0 or visits_count < clients_no then return end
     utils.clear_context(buf, method)
 
-    stored_result = remove_duplicate_locations(stored_result)
-
     local title = 'LSP locations'
+
     local items = util.locations_to_items(stored_result, client.offset_encoding)
+
+    items = remove_duplicate_locations(items)
+    table.sort(items, _config.tagfunc.sort or sort_locations)
 
     set_items_source(items)
 
@@ -91,6 +114,24 @@ M.on_location = function(_, result, ctx, config)
   vim.api.nvim_buf_set_var(buf, method .. '_result', stored_result)
 
   process_locations()
+end
+
+function M.handler(...)
+  M.on_location(...)
+end
+
+M.tagfunc = function(pattern, flags)
+  flags = 'c'
+  local ret = vim.lsp._tagfunc(pattern, flags)
+
+  if ret == vim.NIL then return end
+
+  for i, el in ipairs(ret) do
+    ret[i].lnum = el.cmd:find('%%(%d+)l')
+  end
+  table.sort(ret, sort_locations)
+
+  return ret
 end
 
 return M

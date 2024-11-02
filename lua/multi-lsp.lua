@@ -2,10 +2,10 @@ Redefine_require(true)
 
 local config = require("multi-lsp.config")
 
-local on_hover = require("multi-lsp.hover").on_hover
-local on_location = require("multi-lsp.location").on_location
-local on_signature = require("multi-lsp.signature").on_signature
-local on_diagnostic = require("multi-lsp.diagnostics").on_diagnostic
+local hover = require("multi-lsp.hover")
+local location = require("multi-lsp.location")
+local signature = require("multi-lsp.signature")
+local diagnostic = require("multi-lsp.diagnostics")
 
 local M = {}
 
@@ -15,7 +15,7 @@ local function is_enabled(client, method)
 end
 
 ---Stub out filtered methods, so that Lsp does not fallback to built-in implementation
-local function stub()
+local function stub(_)
 	return stub
 end
 
@@ -25,21 +25,23 @@ local function setup_handlers(client)
 
   local client_handlers = {}
 
-	local handler = is_enabled(client, 'signature') and on_signature or stub
+	local handler = is_enabled(client, 'signature') and signature.handler or stub
 	client_handlers["textDocument/signatureHelp"] = handler
 
-	handler = is_enabled(client, 'hover') and on_hover or stub
+	handler = is_enabled(client, 'hover') and hover.handler or stub
 	client_handlers["textDocument/hover"] = handler
 
-	handler = is_enabled(client, 'location') and on_location or stub
+	handler = is_enabled(client, 'location') and location.handler or stub
 	client_handlers["textDocument/definition"] = handler
   client_handlers["textDocument/implementation"] = handler
   client_handlers["textDocument/typeDefinition"] = handler
   client_handlers["textDocument/declaration"] = handler
 
-	handler = is_enabled(client, 'diagnostics') and on_diagnostic or stub
-	client_handlers["textDocument/publishDiagnostics"] = handler('publishDiagnostics')
+	if config.lsp_handlers.location.tagfunc then vim.lsp.tagfunc = location.tagfunc end
+
+	handler = is_enabled(client, 'diagnostics') and diagnostic.handler or stub
 	client_handlers["textDocument/diagnostic"] = handler
+	client_handlers["textDocument/publishDiagnostics"] = handler('publishDiagnostics')
 
 	client.handlers = client_handlers
 

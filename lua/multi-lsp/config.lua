@@ -1,7 +1,7 @@
 ---@class MultiLspConfig
 ---@field silent boolean supress notifications if no results from Lsp server
 ---@field filter { method: string } default 'all' | name of Lsp server to use
-local config = {
+local default_config = {
 	enabled_servers = { "ruby_lsp", "solargraph" },
 	lsp_handlers = {
 		hover = {
@@ -13,6 +13,9 @@ local config = {
 
 		location = {
 			enabled_servers = { "all" },
+			tagfunc = {
+				sort = nil
+			} ,
 			filter = {},
 		},
 
@@ -48,4 +51,4 @@ local config = {
 	},
 }
 
-return config
+return default_config

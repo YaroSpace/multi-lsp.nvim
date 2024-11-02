@@ -85,4 +85,8 @@ function M.on_signature(_, result, ctx, config)
   return show_signature()
 end
 
+function M.handler(...)
+  M.on_signature(...)
+end
+
 return M

@@ -61,4 +61,8 @@ function M.on_hover(_, result, ctx, config)
 	return show_hover_float()
 end
 
+function M.handler(...)
+  M.on_hover(...)
+end
+
 return M
